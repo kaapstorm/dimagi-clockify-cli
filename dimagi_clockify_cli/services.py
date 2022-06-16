@@ -1,10 +1,11 @@
-from contextlib import asynccontextmanager
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-import httpx
+import requests
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlmodel import Session
 
 from dimagi_clockify_cli.config import Config
 from dimagi_clockify_cli.db import Project, Tag, Task, User, Workspace
@@ -12,23 +13,23 @@ from dimagi_clockify_cli.db import Project, Tag, Task, User, Workspace
 
 class Client:
     """
-    A thin wrapper around httpx.AsyncClient.
+    A thin wrapper around requests.Session.
     """
 
     def __init__(
             self,
-            httpx_client: httpx.AsyncClient,
+            requests_session: requests.Session,
             config: Config,
-    ):
-        self.httpx_client = httpx_client
+    ) -> None:
+        self.session = requests_session
         self.config = config
 
-    async def request(
+    def request(
             self,
             method: str,
             endpoint: str,
             **kwargs
-    ) -> httpx.Response:
+    ) -> requests.Response:
         url = slash_join(self.config.base_url, endpoint)
         headers = {
             'Accept': 'application/json',
@@ -36,7 +37,7 @@ class Client:
             'X-Api-Key': self.config.api_key,
         }
         headers.update(kwargs.pop('headers', {}))
-        response = await self.httpx_client.request(
+        response = self.session.request(
             method,
             url,
             headers=headers,
@@ -45,54 +46,54 @@ class Client:
         return response
 
 
-@asynccontextmanager
-async def get_client(config):
-    async with httpx.AsyncClient() as httpx_client:
-        client = Client(httpx_client, config)
+@contextmanager
+def get_client(config):
+    with requests.Session() as requests_session:
+        client = Client(requests_session, config)
         yield client
 
 
-async def get_workspace(
-        session,
+def get_workspace(
+        session: Session,
         client: Client,
 ) -> Workspace:
     stmt = select(Workspace)
-    result = await session.execute(stmt)
+    result = session.execute(stmt)
     workspace = result.scalars().one_or_none()
     if workspace is None:
-        user = await fetch_user(session, client)
+        user = fetch_user(session, client)
         workspace = user.workspace
     return workspace
 
 
-async def get_user(
-        session,
-        client,
+def get_user(
+        session: Session,
+        client: Client,
 ) -> User:
     stmt = select(User).options(selectinload(User.workspace))
-    result = await session.execute(stmt)
+    result = session.execute(stmt)
     user = result.scalars().one_or_none()
     if user is None:
-        user = await fetch_user(session, client)
+        user = fetch_user(session, client)
     return user
 
 
-async def fetch_user(
-        session,
+def fetch_user(
+        session: Session,
         client: Client,
 ) -> User:
-    response = await client.request('GET', '/user')
+    response = client.request('GET', '/user')
     response.raise_for_status()
     data = response.json()
     workspace = Workspace(id=data['defaultWorkspace'])
     user = User(id=data['id'], workspace=workspace)
     session.add(user)
-    await session.commit()
+    session.commit()
     return user
 
 
-async def get_project(
-        session,
+def get_project(
+        session: Session,
         client: Client,
         workspace: Workspace,
         project_name: str,
@@ -102,22 +103,22 @@ async def get_project(
         .options(selectinload(Project.workspace))
         .where(Project.name == project_name)
     )
-    result = await session.execute(stmt)
+    result = session.execute(stmt)
     project = result.scalars().one_or_none()
     if project is None:
-        project = await fetch_project(session, client, workspace, project_name)
+        project = fetch_project(session, client, workspace, project_name)
     return project
 
 
-async def fetch_project(
-        session,
+def fetch_project(
+        session: Session,
         client: Client,
         workspace: Workspace,
         project_name: str,
 ) -> Project:
     endpoint = f'/workspaces/{workspace.id}/projects'
     params = {'name': project_name}
-    response = await client.request('GET', endpoint, params=params)
+    response = client.request('GET', endpoint, params=params)
     response.raise_for_status()
     data = response.json()
     if not data:
@@ -132,15 +133,16 @@ async def fetch_project(
         workspace=workspace,
     )
     session.add(project)
-    await session.commit()
+    session.commit()
     return project
 
 
-async def get_tags(
-        session,
+def get_tags(
+        session: Session,
         client: Client,
         workspace: Workspace,
-        tag_names: List[str]) -> List[Tag]:
+        tag_names: List[str],
+) -> List[Tag]:
     tags = []
     for tag_name in tag_names:
         stmt = (
@@ -148,16 +150,16 @@ async def get_tags(
             .options(selectinload(Tag.workspace))
             .where(Tag.name == tag_name)
         )
-        result = await session.execute(stmt)
+        result = session.execute(stmt)
         tag = result.scalars().one_or_none()
         if tag is None:
-            tag = await fetch_tag(session, client, workspace, tag_name)
+            tag = fetch_tag(session, client, workspace, tag_name)
         tags.append(tag)
     return tags
 
 
-async def fetch_tag(
-        session,
+def fetch_tag(
+        session: Session,
         client: Client,
         workspace: Workspace,
         tag_name: str,
@@ -167,7 +169,7 @@ async def fetch_tag(
         'name': tag_name,
         'archived': False,
     }
-    response = await client.request('GET', endpoint, params=params)
+    response = client.request('GET', endpoint, params=params)
     response.raise_for_status()
     data = response.json()
     if not data:
@@ -180,12 +182,12 @@ async def fetch_tag(
         workspace=workspace,
     )
     session.add(tag)
-    await session.commit()
+    session.commit()
     return tag
 
 
-async def get_task(
-        session,
+def get_task(
+        session: Session,
         client: Client,
         project: Project,
         task_name: str,
@@ -196,15 +198,15 @@ async def get_task(
         .where(Task.project == project)
         .where(Task.name == task_name)
     )
-    result = await session.execute(stmt)
+    result = session.execute(stmt)
     task = result.scalars().one_or_none()
     if task is None:
-        task = await fetch_task(session, client, project, task_name)
+        task = fetch_task(session, client, project, task_name)
     return task
 
 
-async def fetch_task(
-        session,
+def fetch_task(
+        session: Session,
         client: Client,
         project: Project,
         task_name: str,
@@ -214,7 +216,7 @@ async def fetch_task(
         f'/projects/{project.id}/tasks'
     )
     params = {'name': task_name}
-    response = await client.request('GET', endpoint, params=params)
+    response = client.request('GET', endpoint, params=params)
     response.raise_for_status()
     data = response.json()
     if not data:
@@ -227,26 +229,26 @@ async def fetch_task(
         project=project,
     )
     session.add(task)
-    await session.commit()
+    session.commit()
     return task
 
 
-async def stop_timer(
+def stop_timer(
         client: Client,
         workspace: Workspace,
         user: User,
         since_dt: Optional[datetime] = None,
-):
+) -> None:
     if since_dt is None:
         since_dt = datetime.now()
     endpoint = f'/workspaces/{workspace.id}/user/{user.id}/time-entries'
     # End a minute earlier to prevent overlapping time entries
     body = {'end': zulu(since_dt - timedelta(minutes=1))}
     # Returns a 404 if timer is not running
-    await client.request('PATCH', endpoint, json=body)
+    client.request('PATCH', endpoint, json=body)
 
 
-async def add_time_entry(
+def add_time_entry(
         client: Client,
         description: str,
         workspace: Workspace,
@@ -254,7 +256,7 @@ async def add_time_entry(
         task: Task,
         tags: List[Tag],
         since_dt: Optional[datetime] = None,
-):
+) -> None:
     if since_dt is None:
         since_dt = datetime.utcnow()
     endpoint = f'/workspaces/{workspace.id}/time-entries'
@@ -266,7 +268,7 @@ async def add_time_entry(
         'taskId': task.id,
         'tagIds': [t.id for t in tags]
     }
-    response = await client.request('POST', endpoint, json=body)
+    response = client.request('POST', endpoint, json=body)
     response.raise_for_status()
 
 

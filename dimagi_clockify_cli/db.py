@@ -1,9 +1,9 @@
 import os
-from contextlib import asynccontextmanager
+from collections.abc import Iterator
+from contextlib import contextmanager
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy.future import Engine
+from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
 
 from dimagi_clockify_cli.config import get_config_dir
 
@@ -39,26 +39,20 @@ class Tag(SQLModel, table=True):
     workspace: Workspace = Relationship()
 
 
-def get_engine():
+def get_engine() -> Engine:
     config_dir = get_config_dir()
     filename = os.path.join(config_dir, 'cache.db')
-    return create_async_engine(f'sqlite+aiosqlite:///{filename}')
+    return create_engine(f'sqlite:///{filename}')
 
 
-@asynccontextmanager
-async def get_session():
+@contextmanager
+def get_session() -> Iterator[Session]:
     engine = get_engine()
-    session_class = sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
-    async with session_class() as session:
+    with Session(engine) as session:
         yield session
 
 
-async def init_db():
+def init_db():
     engine = get_engine()
-    async with engine.begin() as conn:
-        # `create_all()` has no effect if tables exist already
-        await conn.run_sync(SQLModel.metadata.create_all)
+    # `create_all()` has no effect if tables exist already
+    SQLModel.metadata.create_all(engine)
