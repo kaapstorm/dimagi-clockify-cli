@@ -171,19 +171,60 @@ def fetch_tag(
     }
     response = client.request('GET', endpoint, params=params)
     response.raise_for_status()
-    data = response.json()
-    if not data:
-        raise ValueError(f'Tag "{tag_name}" not found')
-    if len(data) > 1:
-        raise ValueError(f'Multiple tags "{tag_name}" found')
-    tag = Tag(
-        id=data[0]['id'],
-        name=tag_name,
-        workspace=workspace,
-    )
+    tags_list = response.json()
+    tag = parse_tags_list(tags_list, workspace, tag_name)
     session.add(tag)
     session.commit()
     return tag
+
+
+def parse_tags_list(
+        tags_list: list,
+        workspace: Workspace,
+        tag_name: str,
+) -> Tag:
+    """
+    Parses the JSON response when searching for a tag, and returns a
+    ``Tag`` instance. Raises ValueError if none or multiple are found.
+
+    An example value of ``tags_list``::
+
+        [
+            {
+                'archived': False,
+                'id': '6183bc57cf87660952137e64',
+                'name': 'Tag Name 123',
+                'workspaceId': '600c355584390918698e348d'
+            },
+            {
+                'archived': False,
+                'id': '62419968746e3967ce0db05f',
+                'name': 'Tag Name 123 - ABC',
+                'workspaceId': '600c355584390918698e348d'
+            }
+        ]
+
+    """
+    if not tags_list:
+        raise ValueError(f'Tag "{tag_name}" not found')
+
+    if len(tags_list) > 1:
+        exact_match = [t for t in tags_list if t['name'] == tag_name]
+        if len(exact_match) == 1:
+            return Tag(
+                id=exact_match[0]['id'],
+                name=tag_name,
+                workspace=workspace,
+            )
+
+        names = ', '.join((repr(t['name']) for t in tags_list))
+        raise ValueError(f'Multiple tags "{tag_name}" found: {names}')
+
+    return Tag(
+        id=tags_list[0]['id'],
+        name=tag_name,
+        workspace=workspace,
+    )
 
 
 def get_task(
