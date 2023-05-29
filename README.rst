@@ -41,7 +41,7 @@ Create and activate a virtual environment::
 
 Install::
 
-    $ pip install -e .
+    $ pip install .
 
 
 Configuration
