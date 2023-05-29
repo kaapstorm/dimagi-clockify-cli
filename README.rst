@@ -11,13 +11,17 @@ Start clocking time to the "gtd_meeting" bucket::
 
     $ dcl gtd_meeting
 
+Start clocking time to the "jamaica" bucket since 14:00::
+
+    $ dcl jamaica --since 14:00
+
 Stop clocking time::
 
     $ dcl stop
 
-Start clocking time to the "jamaica" bucket since 14:00::
+List all buckets::
 
-    $ dcl jamaica --since 14:00
+    $ dcl list
 
 
 Requirements
