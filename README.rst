@@ -24,23 +24,24 @@ Requirements
 ------------
 
 * Python 3.8 or higher
-* `Poetry <https://python-poetry.org/>`_
 
 
 Installation
 ------------
 
-Clone the repository, and install using Poetry::
+Clone the repository::
 
     $ git clone https://github.com/kaapstorm/dimagi-clockify-cli.git
     $ cd dimagi-clockify-cli
-    $ poetry install
 
-``poetry install`` will create a virtualenv, install requirements, and
-put the ``dcl`` command in the virtualenv's ``bin`` directory. Activate
-the virtualenv using ::
+Create and activate a virtual environment::
 
-    $ poetry shell
+    $ python3 -m venv venv
+    $ source venv/bin/activate
+
+Install::
+
+    $ pip install -e .
 
 
 Configuration

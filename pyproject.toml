@@ -1,23 +1,38 @@
-[tool.poetry]
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
 name = "dimagi-clockify-cli"
 version = "0.1.0"
 description = "A Clockify command line interface, for the way Dimagi uses it."
-authors = ["Norman Hooper <nhooper@dimagi.com>"]
+authors = [
+    { name="Norman Hooper", email="nhooper@dimagi.com" },
+]
+readme = "README.rst"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Scheduling",
+]
+dependencies = [
+    "aiosqlite",
+    "PyYAML",
+    "sqlmodel",
+    "typer[all]",
+    "requests",
+]
 
-[tool.poetry.scripts]
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
+
+[project.scripts]
 dcl = "dimagi_clockify_cli.main:app"
 
-[tool.poetry.dependencies]
-aiosqlite = "^0.17.0"
-python = "^3.8"
-PyYAML = "^6.0"
-sqlmodel = "^0.0.6"
-typer = {extras = ["all"], version = "^0.4.0"}
-requests = "^2.28.0"
-
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[project.urls]
+"Homepage" = "https://github.com/kaapstorm/dimagi-clockify-cli"
+"Bug Tracker" = "https://github.com/kaapstorm/dimagi-clockify-cli/issues"
