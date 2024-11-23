@@ -36,3 +36,6 @@ dcl = "dimagi_clockify_cli.main:app"
 [project.urls]
 "Homepage" = "https://github.com/kaapstorm/dimagi-clockify-cli"
 "Bug Tracker" = "https://github.com/kaapstorm/dimagi-clockify-cli/issues"
+
+[tool.setuptools]
+packages = ["dimagi_clockify_cli"]
